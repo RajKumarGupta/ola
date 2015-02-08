@@ -1,0 +1,16 @@
+package com.ola.insta.common;
+
+public class Constants {
+
+	public static final String REST_URL_DOMAIN = "http://private-30b31-olainsta.apiary-mock.com";
+	public static final String REST_URL_GET_CAB_AVAILIBILITY_REQUEST = REST_URL_DOMAIN + "/cab"; 
+	public static final String REST_URL_GET_CAB_BOOKING_REQUEST = REST_URL_DOMAIN + "/cab";
+	public final static String VOICE_MESSAGE = "chalo niklo";
+	public final static int DEFAULT_ZOOM = 16;
+	public static final Integer MAX_ETA_DIFFERENCE = 5;
+	public static final String SELECTED_CAB_ID = "SELECTED_CAB_ID";
+	public static final String BOOKINGS_TODAY = "BOOKINGS_TODAY";
+	public static final String ETA = "ETA";
+	public static final String LATITUDE = "LATITUDE";
+	public static final String LONGITUDE = "LONGITUDE";
+}

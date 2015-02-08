@@ -1,0 +1,198 @@
+package com.ola.insta;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import org.apache.http.NameValuePair;
+import org.apache.http.message.BasicNameValuePair;
+import com.google.gson.Gson;
+import com.ola.insta.common.Constants;
+import com.ola.insta.common.Utilities;
+import com.ola.insta.rest.model.CabAvailibilityResponse;
+import com.ola.insta.rest.util.HttpUtil;
+import android.support.v7.app.ActionBar;
+import android.support.v7.app.ActionBarActivity;
+import android.support.v4.app.Fragment;
+import android.app.ProgressDialog;
+import android.content.Intent;
+import android.os.AsyncTask;
+import android.os.Bundle;
+import android.view.LayoutInflater;
+import android.view.Menu;
+import android.view.MenuItem;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.Toast;
+
+import com.fourmob.panningview.library.PanningView;
+
+public class MainActivity extends ActionBarActivity {
+
+	private static final String TAG = "MainActivity";
+	private ProgressDialog mProgressDialog;
+	private Utilities mUtility;
+	private String mCabAvailibilityResponseJson;
+	private String mId = "34";
+	private String mlat = "77";
+	private String mlng = "66";
+	private String mSelectedCabId;
+	private CabAvailibilityResponse mSelectedCab;
+	Map<String, CabAvailibilityResponse> mCabsMap;
+
+	@Override
+	protected void onCreate(Bundle savedInstanceState) {
+		super.onCreate(savedInstanceState);
+		setContentView(R.layout.activity_main);
+
+		// Hide Actionbar
+		ActionBar actionBar = getSupportActionBar();
+		actionBar.hide();
+		
+
+		mUtility = new Utilities();
+		mProgressDialog = mUtility.GetProcessDialog(this);
+
+		if (savedInstanceState == null) {
+			getSupportFragmentManager().beginTransaction()
+					.add(R.id.container, new PlaceholderFragment()).commit();
+			if (Utilities.isNetworkAvailable(this)) {
+				new GetCabAvailibilityRequestTask().execute();
+			} else {
+				Utilities mUltilities = new Utilities();
+				mUltilities.showDialogConfirm(MainActivity.this, "Message",
+						"Please check network connection", true).show();
+			}
+		}
+	}
+
+	private class GetCabAvailibilityRequestTask extends
+			AsyncTask<String, Void, String> {
+		@Override
+		protected void onPreExecute() {
+			super.onPreExecute();
+			//mProgressDialog.setMessage("Please Wait......");
+			//mProgressDialog.show();
+		}
+
+		@Override
+		protected String doInBackground(String... params) {
+
+			List<NameValuePair> apiParams = new ArrayList<NameValuePair>(1);
+			apiParams.add(new BasicNameValuePair("userId", mId));
+			apiParams.add(new BasicNameValuePair("lat", mlat));
+			apiParams.add(new BasicNameValuePair("lon", mlng));
+
+			HttpUtil restAPIUtil = new HttpUtil(
+					Constants.REST_URL_GET_CAB_AVAILIBILITY_REQUEST, "GET",
+					apiParams);
+
+			mCabAvailibilityResponseJson = restAPIUtil.makeRESTCall();
+			return null;
+		}
+
+		@Override
+		protected void onPostExecute(String result) {
+
+			/*if (mProgressDialog != null) {
+				mProgressDialog.cancel();
+			}*/
+			if(mCabAvailibilityResponseJson == null || mCabAvailibilityResponseJson.contains("Application Error")){
+				Toast.makeText(getApplicationContext(),"Server Error while fetching REST API",
+						Toast.LENGTH_SHORT).show();
+				finish();
+			}
+			Gson gson = new Gson();
+			CabAvailibilityResponse[] mCabAvailibilityResponse = gson.fromJson(
+					mCabAvailibilityResponseJson,
+					CabAvailibilityResponse[].class);
+
+			mCabsMap = new HashMap<String, CabAvailibilityResponse>();
+
+			if (mCabAvailibilityResponse.length > 0) {
+				String leastEtaCab = mCabAvailibilityResponse[0].getCabId();
+				Long leastEta = mCabAvailibilityResponse[0].getEta();
+
+				String leastBookingsCab = mCabAvailibilityResponse[0]
+						.getCabId();
+				Integer leastBookings = mCabAvailibilityResponse[0]
+						.getBookingsToday();
+
+				for (int i = 0; i < mCabAvailibilityResponse.length; i++) {
+					mCabsMap.put(mCabAvailibilityResponse[i].getCabId(),
+							mCabAvailibilityResponse[i]);
+					if (leastEta > mCabAvailibilityResponse[i].getEta()) {
+						leastEta = mCabAvailibilityResponse[i].getEta();
+						leastEtaCab = mCabAvailibilityResponse[i].getCabId();
+					}
+					if (leastBookings > mCabAvailibilityResponse[i]
+							.getBookingsToday()) {
+						leastBookings = mCabAvailibilityResponse[i]
+								.getBookingsToday();
+						leastBookingsCab = mCabAvailibilityResponse[i]
+								.getCabId();
+					}
+				}
+
+				if (Math.abs(mCabsMap.get(leastBookingsCab).getEta()
+						- mCabsMap.get(leastEtaCab).getEta()) < Constants.MAX_ETA_DIFFERENCE) {
+					mSelectedCabId = leastBookingsCab;
+				} else {
+					mSelectedCabId = leastEtaCab;
+				}
+				mSelectedCab = mCabsMap.get(mSelectedCabId);
+
+			}
+
+			Intent intent = new Intent();
+			intent.setClass(MainActivity.this, BookingAcivity.class);
+			intent.putExtra(Constants.CAB_ID, mSelectedCab.getCabId());
+			intent.putExtra(Constants.CAB_LAT, mSelectedCab.getLat());
+			intent.putExtra(Constants.CAB_LANG, mSelectedCab.getLon());
+			intent.putExtra(Constants.CAB_ETA,  mSelectedCab.getEta());
+			startActivity(intent);
+			finish();
+		}
+	}
+
+	@Override
+	public boolean onCreateOptionsMenu(Menu menu) {
+		// Inflate the menu; this adds items to the action bar if it is present.
+		getMenuInflater().inflate(R.menu.main, menu);
+		return true;
+	}
+
+	@Override
+	public boolean onOptionsItemSelected(MenuItem item) {
+		// Handle action bar item clicks here. The action bar will
+		// automatically handle clicks on the Home/Up button, so long
+		// as you specify a parent activity in AndroidManifest.xml.
+		int id = item.getItemId();
+		if (id == R.id.action_settings) {
+			return true;
+		}
+		return super.onOptionsItemSelected(item);
+	}
+
+	/**
+	 * A placeholder fragment containing a simple view.
+	 */
+	public static class PlaceholderFragment extends Fragment {
+
+		public PlaceholderFragment() {
+		}
+
+		@Override
+		public View onCreateView(LayoutInflater inflater, ViewGroup container,
+				Bundle savedInstanceState) {
+			View rootView = inflater.inflate(R.layout.fragment_main, container,
+					false);
+
+			PanningView panningView = (PanningView) rootView
+					.findViewById(R.id.panningView);
+			panningView.startPanning();
+
+			return rootView;
+		}
+	}
+}

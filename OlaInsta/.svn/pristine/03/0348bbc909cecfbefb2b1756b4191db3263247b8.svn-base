@@ -1,0 +1,202 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/LinearLayout1"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:layout_gravity="center_vertical"
+    android:layout_marginBottom="8dp"
+    android:layout_marginLeft="8dp"
+    android:layout_marginRight="8dp"
+    android:layout_marginTop="8dp"
+    android:background="@drawable/container_layout_shadow_white"
+    android:orientation="vertical"
+    android:paddingBottom="5dp"
+    android:paddingLeft="20dp"
+    android:paddingRight="20dp"
+    android:paddingTop="20dp"
+    tools:context="com.ola.insta.CabDetailsActivity$PlaceholderFragment" >
+
+    <LinearLayout
+        android:id="@+id/LinearLayout2"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_vertical"
+        android:layout_marginTop="20dp"
+        android:orientation="vertical" >
+
+        <TextView
+            android:id="@+id/successMessage1"
+            style="@style/tvLabel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_horizontal"
+            android:text="Your cab is booked"
+            android:textSize="20sp"
+            android:typeface="monospace" />
+
+        <TextView
+            android:id="@+id/successMessage2"
+            style="@style/tvLabel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_horizontal"
+            android:text="Here is the details."
+            android:textSize="12sp"
+            android:typeface="monospace" />
+    </LinearLayout>
+
+    <View
+        android:layout_width="fill_parent"
+        android:layout_height="1dip"
+        android:layout_marginBottom="20dp"
+        android:layout_marginTop="10dp"
+        android:background="@color/light_blue" />
+
+    <LinearLayout
+        android:id="@+id/LinearLayout3"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_vertical"
+        android:layout_marginTop="5dp"
+        android:orientation="vertical" >
+
+        <ImageView
+            android:id="@+id/imageView1"
+            android:layout_width="130dp"
+            android:layout_height="130dp"
+            android:layout_gravity="center_horizontal"
+            android:src="@drawable/ic_profile" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/LinearLayout4"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="0dp"
+        android:gravity="center_vertical"
+        android:orientation="vertical" >
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:paddingBottom="30dp"
+            android:orientation="horizontal" >
+
+            <TextView
+                android:id="@+id/driverNameValue"
+                style="@style/TextAppearance.AppCompat.Light.SearchResult.Title"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_horizontal"
+                android:text="" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:orientation="horizontal" >
+
+            <TextView
+                android:id="@+id/driverMobile"
+                style="@style/tvLabel"
+                android:layout_width="140dp"
+                android:layout_height="wrap_content"
+                android:text="Mobile Number :" />
+
+            <TextView
+                android:id="@+id/driverMobileValue"
+                style="@style/tvValue"
+                android:layout_width="150dp"
+                android:layout_height="wrap_content"
+                android:text="" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:orientation="horizontal" >
+
+            <TextView
+                android:id="@+id/duration"
+                style="@style/tvLabel"
+                android:layout_width="140dp"
+                android:layout_height="wrap_content"
+                android:text="Estimated Arrival :" />
+
+            <TextView
+                android:id="@+id/durationValue"
+                style="@style/tvValue"
+                android:layout_width="150dp"
+                android:layout_height="wrap_content"
+                android:text="" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:orientation="horizontal" >
+
+            <TextView
+                android:id="@+id/licenseNumber"
+                style="@style/tvLabel"
+                android:layout_width="140dp"
+                android:layout_height="wrap_content"
+                android:text="Cab Number :" />
+
+            <TextView
+                android:id="@+id/licenseNumberValue"
+                style="@style/tvValue"
+                android:layout_width="150dp"
+                android:layout_height="wrap_content"
+                android:text="" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:orientation="horizontal" >
+
+            <TextView
+                android:id="@+id/carModel"
+                style="@style/tvLabel"
+                android:layout_width="140dp"
+                android:layout_height="wrap_content"
+                android:text="Cab Model :" />
+
+            <TextView
+                android:id="@+id/carModelValue"
+                style="@style/tvValue"
+                android:layout_width="150dp"
+                android:layout_height="wrap_content"
+                android:text="" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dip"
+        android:layout_weight="1"
+        android:gravity="center|bottom"
+        android:orientation="vertical" >
+
+        <View
+            android:layout_width="fill_parent"
+            android:layout_height="1dip"
+            android:layout_marginBottom=" 10dp"
+            android:background="@color/light_blue" />
+
+        <Button
+            android:id="@+id/CallButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="10dp"
+            android:onClick="onClickCallDriver"
+            android:text="Call Driver" />
+    </LinearLayout>
+
+</LinearLayout>

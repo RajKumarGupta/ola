@@ -1,0 +1,284 @@
+package com.ola.insta;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+import org.apache.http.NameValuePair;
+import org.apache.http.message.BasicNameValuePair;
+import android.annotation.SuppressLint;
+import android.app.ProgressDialog;
+import android.content.ActivityNotFoundException;
+import android.content.Context;
+import android.content.Intent;
+import android.location.Location;
+import android.os.AsyncTask;
+import android.os.Bundle;
+import android.speech.RecognizerIntent;
+import android.support.v7.app.ActionBarActivity;
+import android.util.Log;
+import android.view.View;
+import android.view.View.OnClickListener;
+import android.widget.ImageButton;
+import android.widget.Toast;
+import com.google.android.gms.maps.CameraUpdateFactory;
+import com.google.android.gms.maps.GoogleMap;
+import com.google.android.gms.maps.SupportMapFragment;
+import com.google.android.gms.maps.model.BitmapDescriptorFactory;
+import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.MarkerOptions;
+import com.google.gson.Gson;
+import com.ola.insta.common.Constants;
+import com.ola.insta.common.Utilities;
+import com.ola.insta.location.MyLocationManager;
+import com.ola.insta.rest.model.CabBookingResponse;
+import com.ola.insta.rest.util.HttpUtil;
+
+public class BookingAcivity extends ActionBarActivity implements
+		OnClickListener {
+
+	private static final String TAG = "BookingAcivity";
+	private ProgressDialog mProgressDialog;
+	private Utilities mUtility;
+	private String mCabBookingResponseJson;
+	private String mId = "34";
+	private Double mLat;
+	private Double mLng;
+	private String mAddress = "xyz";
+	private String mBookingTime = "3000";
+	private GoogleMap mMap;
+	private Context context;
+	private String mCabId;
+	private Double mCabLat;
+	private Double mCabLng;
+	private Long mCabEta;
+
+	protected int getLayoutId() {
+		return R.layout.fragment_voice_booking;
+	}
+
+	@Override
+	public void onCreate(Bundle savedInstanceState) {
+		super.onCreate(savedInstanceState);
+		setContentView(getLayoutId());
+		mUtility = new Utilities();
+		mProgressDialog = mUtility.GetProcessDialog(this);
+		context = BookingAcivity.this;
+
+		Intent intent = getIntent();
+		mCabId = intent.getStringExtra(Constants.CAB_ID);
+		mCabLat = intent.getDoubleExtra(Constants.CAB_LAT, 0.0);
+		mCabLng = intent.getDoubleExtra(Constants.CAB_LANG, 0.0);
+		mCabEta = intent.getLongExtra(Constants.CAB_ETA, 0);
+		init();
+	}
+
+	@Override
+	protected void onResume() {
+		super.onResume();
+	}
+
+	private ImageButton btnSpeak;
+	private final int REQ_CODE_SPEECH_INPUT = 100;
+
+	@SuppressLint("NewApi")
+	private void init() {
+
+		/*
+		 * getWindow().setFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS
+		 * , WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS);
+		 */
+
+		mMap = ((SupportMapFragment) getSupportFragmentManager()
+				.findFragmentById(R.id.map)).getMap();
+		MarkerOptions cabMarker = new MarkerOptions();
+		LatLng cabLatLng = new LatLng(mCabLat, mCabLng);
+		cabMarker.position(cabLatLng);
+		cabMarker.icon(BitmapDescriptorFactory.fromResource(R.drawable.marker));
+
+		cabMarker.title(mCabEta + "");
+		mMap.addMarker(cabMarker);
+		new MyLocationManager(context,
+				new MyLocationManager.LocationCallback() {
+
+					@Override
+					public void onError() {
+						// TODO Auto-generated method stub
+					}
+
+					@Override
+					public void onConnect(Location location) {
+						// TODO Auto-generated method stub
+						mLat = location.getLatitude();
+						mLng = location.getLongitude();
+						LatLng latLng = new LatLng(location.getLatitude(),
+								location.getLongitude());
+
+						MarkerOptions userMarker = new MarkerOptions();
+						userMarker.position(latLng);
+						userMarker.icon(BitmapDescriptorFactory
+								.fromResource(R.drawable.marker));
+
+						// cabMarker.snippet("Summary");
+
+						mMap.addMarker(userMarker);
+
+						mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(
+								latLng, Constants.DEFAULT_ZOOM));
+					}
+				});
+
+		btnSpeak = (ImageButton) findViewById(R.id.btnSpeak);
+
+		btnSpeak.setOnClickListener(this);
+	}
+
+	/**
+	 * Showing google speech input dialog
+	 * */
+	private void promptSpeechInput() {
+		Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+		intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL,
+				RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+		intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault());
+		intent.putExtra(RecognizerIntent.EXTRA_PROMPT,
+				getString(R.string.speech_prompt));
+		try {
+			startActivityForResult(intent, REQ_CODE_SPEECH_INPUT);
+		} catch (ActivityNotFoundException a) {
+			Toast.makeText(getApplicationContext(),
+					getString(R.string.speech_not_supported),
+					Toast.LENGTH_SHORT).show();
+		}
+	}
+
+	/**
+	 * Receiving speech input
+	 * */
+	@Override
+	public void onActivityResult(int requestCode, int resultCode, Intent data) {
+		super.onActivityResult(requestCode, resultCode, data);
+
+		switch (requestCode) {
+		case REQ_CODE_SPEECH_INPUT: {
+			if (resultCode == RESULT_OK && null != data) {
+
+				ArrayList<String> result = data
+						.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS);
+				boolean isMatched = false;
+				for (String string : result) {
+					if (string.contains(Constants.VOICE_MESSAGE)) {
+						Toast.makeText(
+								getApplicationContext(),
+								getApplicationContext().getString(
+										R.string.cab_booked),
+								Toast.LENGTH_SHORT).show();
+
+						// TODO Call REST API\
+
+						if (Utilities.isNetworkAvailable(this)) {
+							new GetCabBookingRequestTask().execute();
+						} else {
+							Utilities mUltilities = new Utilities();
+							mUltilities.showDialogConfirm(BookingAcivity.this,
+									"Message",
+									"Please check network connection", true)
+									.show();
+						}
+						isMatched = true;
+						break;
+					}
+
+				}
+				if(!isMatched){
+					Toast.makeText(
+							getApplicationContext(),
+							getApplicationContext().getString(
+									R.string.speech_try_again),
+							Toast.LENGTH_SHORT).show();
+				}
+				
+			}
+			break;
+		}
+
+		}
+	}
+
+	@Override
+	public void onClick(View v) {
+		// TODO Auto-generated method stub
+		switch (v.getId()) {
+		case R.id.btnSpeak:
+			promptSpeechInput();
+			break;
+
+		default:
+			break;
+		}
+	}
+
+	private class GetCabBookingRequestTask extends
+			AsyncTask<String, Void, String> {
+
+		@Override
+		protected void onPreExecute() {
+			super.onPreExecute();
+			mProgressDialog.setMessage("Please Wait......");
+			mProgressDialog.show();
+		}
+
+		@Override
+		protected String doInBackground(String... params) {
+			List<NameValuePair> apiParams = new ArrayList<NameValuePair>(1);
+			apiParams.add(new BasicNameValuePair("userId", mId));
+			apiParams.add(new BasicNameValuePair("lat", mLat + ""));
+			apiParams.add(new BasicNameValuePair("lon", mLng + ""));
+			apiParams.add(new BasicNameValuePair("address", mAddress));
+			apiParams.add(new BasicNameValuePair("bookingTime", mBookingTime));
+			HttpUtil restAPIUtil = new HttpUtil(
+					Constants.REST_URL_GET_CAB_BOOKING_REQUEST, "POST",
+					apiParams);
+
+			mCabBookingResponseJson = restAPIUtil.makeRESTCall();
+			return null;
+		}
+
+		@Override
+		protected void onPostExecute(String result) {
+
+			if (mProgressDialog != null) {
+				mProgressDialog.cancel();
+			}
+
+			if (mCabBookingResponseJson == null
+					|| mCabBookingResponseJson.contains("Application Error")) {
+				Toast.makeText(getApplicationContext(),
+						"Server Error while fetching REST API",
+						Toast.LENGTH_SHORT).show();
+				finish();
+			}
+
+			Gson gson = new Gson();
+			CabBookingResponse mCabBookingResponse = gson.fromJson(
+					mCabBookingResponseJson, CabBookingResponse.class);
+			Log.d(TAG,
+					"CabBookingResponse: "
+							+ mCabBookingResponse.getDriverName());
+			Intent intent = new Intent(getApplicationContext(),
+					CabDetailsActivity.class);
+			intent.putExtra(Constants.DRIVER_NAME,
+					mCabBookingResponse.getDriverName());
+			intent.putExtra(Constants.DRIVER_MOBILE,
+					mCabBookingResponse.getDriverMobile());
+			intent.putExtra(Constants.DRIVER_DURATION,
+					mCabBookingResponse.getDuration());
+			intent.putExtra(Constants.DRIVER_CAR_MODEL,
+					mCabBookingResponse.getCarModel());
+			intent.putExtra(Constants.DRIVER_CAR_DRIVER_MOBILE,
+					mCabBookingResponse.getDriverMobile());
+			startActivity(intent);
+
+		}
+	}
+
+}

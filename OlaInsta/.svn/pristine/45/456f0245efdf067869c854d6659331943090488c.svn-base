@@ -1,0 +1,497 @@
+package com.ola.insta;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+
+import org.apache.http.NameValuePair;
+import org.apache.http.message.BasicNameValuePair;
+
+import android.annotation.SuppressLint;
+import android.app.ProgressDialog;
+import android.content.ActivityNotFoundException;
+import android.content.Context;
+import android.content.Intent;
+import android.database.Cursor;
+import android.location.Address;
+import android.location.Geocoder;
+import android.location.Location;
+import android.net.Uri;
+import android.os.AsyncTask;
+import android.os.Bundle;
+import android.provider.ContactsContract.CommonDataKinds.Phone;
+import android.provider.ContactsContract.Contacts;
+import android.speech.RecognizerIntent;
+import android.speech.tts.TextToSpeech;
+import android.support.v7.app.ActionBarActivity;
+import android.telephony.gsm.SmsManager;
+import android.util.Log;
+import android.view.Menu;
+import android.view.MenuItem;
+import android.view.View;
+import android.view.View.OnClickListener;
+import android.widget.ImageButton;
+import android.widget.Toast;
+
+import com.gc.materialdesign.widgets.MaterialDialog;
+import com.google.android.gms.maps.CameraUpdateFactory;
+import com.google.android.gms.maps.GoogleMap;
+import com.google.android.gms.maps.SupportMapFragment;
+import com.google.android.gms.maps.model.BitmapDescriptorFactory;
+import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.MarkerOptions;
+import com.google.gson.Gson;
+import com.ola.insta.common.Constants;
+import com.ola.insta.common.Utilities;
+import com.ola.insta.location.MyLocationManager;
+import com.ola.insta.pref.PreferenceManager;
+import com.ola.insta.rest.model.CabBookingResponse;
+import com.ola.insta.rest.util.HttpUtil;
+
+public class BookingAcivity extends ActionBarActivity implements
+		OnClickListener, TextToSpeech.OnInitListener {
+
+	private static final String TAG = "BookingAcivity";
+	private ProgressDialog mProgressDialog;
+	private Utilities mUtility;
+	private String mCabBookingResponseJson;
+	private String mId = "34";
+	private Double mLat;
+	private Double mLng;
+	private String mAddress = "xyz";
+	private String mBookingTime = "3000";
+	private GoogleMap mMap;
+	private Context context;
+	private String mCabId;
+	private Double mCabLat;
+	private Double mCabLng;
+	private Long mCabEta;
+
+	private ImageButton btnSpeak;
+	private final int REQ_CODE_SPEECH_INPUT = 100;
+	private final int REQ_CODE_SELECT_CONTACT = 200;
+	private TextToSpeech mTextToSpeech;
+
+	protected int getLayoutId() {
+		return R.layout.fragment_voice_booking;
+	}
+
+	@Override
+	public void onCreate(Bundle savedInstanceState) {
+		super.onCreate(savedInstanceState);
+		setContentView(getLayoutId());
+		mTextToSpeech = new TextToSpeech(this, this);
+		
+		mUtility = new Utilities();
+		mProgressDialog = mUtility.GetProcessDialog(this);
+		context = BookingAcivity.this;
+
+		Intent intent = getIntent();
+		mCabId = intent.getStringExtra(Constants.CAB_ID);
+		mCabLat = intent.getDoubleExtra(Constants.CAB_LAT, 0.0);
+		mCabLng = intent.getDoubleExtra(Constants.CAB_LANG, 0.0);
+		mCabEta = intent.getLongExtra(Constants.CAB_ETA, 0);
+		init();
+	}
+
+	@Override
+	protected void onResume() {
+		super.onResume();
+	}
+
+
+	@SuppressLint("NewApi")
+	private void init() {
+
+		/*
+		 * getWindow().setFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS
+		 * , WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS);
+		 */
+
+		mMap = ((SupportMapFragment) getSupportFragmentManager()
+				.findFragmentById(R.id.map)).getMap();
+		
+		new MyLocationManager(context,
+				new MyLocationManager.LocationCallback() {
+
+					@Override
+					public void onError() {
+						// TODO Auto-generated method stub
+					}
+
+					@Override
+					public void onConnect(Location location) {
+						// TODO Auto-generated method stub
+						mLat = location.getLatitude();
+						mLng = location.getLongitude();
+						LatLng latLng = new LatLng(location.getLatitude(),
+								location.getLongitude());
+						
+						mMap.clear();
+						
+						/*
+						 * Add user marker
+						 */
+						MarkerOptions userMarker = new MarkerOptions();
+						userMarker.position(latLng);
+						userMarker.icon(BitmapDescriptorFactory
+								.fromResource(R.drawable.marker));
+						mMap.addMarker(userMarker);
+						
+						/*
+						 * Add cab marker
+						 */
+						MarkerOptions cabMarker = new MarkerOptions();
+						LatLng cabLatLng = new LatLng(mCabLat, mCabLng);
+						cabMarker.position(cabLatLng);
+						cabMarker.icon(BitmapDescriptorFactory.fromResource(R.drawable.cab_marker));
+
+						cabMarker.title(mCabEta + " Minutes.");
+						mMap.addMarker(cabMarker);
+						
+						mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(
+								latLng, Constants.DEFAULT_ZOOM));
+					}
+				});
+
+		btnSpeak = (ImageButton) findViewById(R.id.btnSpeak);
+		btnSpeak.setOnClickListener(this);
+	}
+
+	/**
+	 * Showing google speech input dialog
+	 * */
+	private void promptSpeechInput() {
+		Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+		intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL,
+				RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+		intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault());
+		intent.putExtra(RecognizerIntent.EXTRA_PROMPT,
+				getString(R.string.speech_prompt));
+		try {
+			startActivityForResult(intent, REQ_CODE_SPEECH_INPUT);
+		} catch (ActivityNotFoundException a) {
+			Toast.makeText(getApplicationContext(),
+					getString(R.string.speech_not_supported),
+					Toast.LENGTH_SHORT).show();
+		}
+	}
+
+	/**
+	 * Receiving speech input
+	 * */
+	@Override
+	public void onActivityResult(int requestCode, int resultCode, Intent data) {
+		super.onActivityResult(requestCode, resultCode, data);
+
+		if (resultCode == RESULT_OK && null != data) {
+			switch (requestCode) {
+			case REQ_CODE_SPEECH_INPUT:
+
+
+				ArrayList<String> result = data
+						.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS);
+				boolean isMatched = false;
+				for (String string : result) {
+					if (string.contains(Constants.VOICE_MESSAGE)) {
+						/*Toast.makeText(
+								getApplicationContext(),
+								getApplicationContext().getString(
+										R.string.cab_booked),
+								Toast.LENGTH_SHORT).show();*/
+
+						// Call REST API
+
+						if (Utilities.isNetworkAvailable(this)) {
+							new GetCabBookingRequestTask().execute();
+						} else {
+							Utilities mUltilities = new Utilities();
+							mUltilities.showDialogConfirm(BookingAcivity.this,
+									"Message",
+									"Please check network connection", true)
+									.show();
+						}
+						isMatched = true;
+						break;
+					}
+
+				}
+				if(!isMatched){
+					speakOut("Please try again!");
+					Toast.makeText(
+							getApplicationContext(),
+							getApplicationContext().getString(
+									R.string.speech_try_again),
+							Toast.LENGTH_SHORT).show();
+				}
+				
+			
+				break;
+
+			case REQ_CODE_SELECT_CONTACT:
+				Uri uri = data.getData();
+				String id = uri.getLastPathSegment();
+
+				Cursor contact = getContentResolver().query(Phone.CONTENT_URI,
+						null, Phone.CONTACT_ID + "=?", new String[] { id },
+						null);
+				if (contact.moveToFirst()) {
+					if (contact.getString(contact
+							.getColumnIndex(Phone.HAS_PHONE_NUMBER)) != null) {
+
+						final String contactName = contact.getString(contact
+								.getColumnIndex(Phone.DISPLAY_NAME));
+						final String phoneNum = contact.getString(contact
+								.getColumnIndex(Phone.NUMBER));
+
+						MaterialDialog dialog = new MaterialDialog(context,
+								context.getString(R.string.emergency_contact),
+								"Name : " + contactName + "\nNumber : "
+										+ phoneNum,
+								context.getString(R.string.add),
+								context.getString(R.string.cancel));
+						dialog.setOnAcceptButtonClickListener(new OnClickListener() {
+
+							@Override
+							public void onClick(View v) {
+
+								saveToShrPref(contactName, phoneNum);
+								Toast.makeText(
+										context,
+										"Emergency contact saved successfully!",
+										Toast.LENGTH_LONG).show();
+
+							}
+						});
+						dialog.setOnCancelButtonClickListener(new OnClickListener() {
+
+							@Override
+							public void onClick(View v) {
+
+							}
+						});
+						dialog.show();
+
+					} else
+						Toast.makeText(
+								context,
+								context.getString(R.string.contact_dont_have_number),
+								Toast.LENGTH_LONG).show();
+				}
+				break;
+
+			default:
+				break;
+			}
+
+		}
+	}
+
+	/*
+	 * Saving data in SharedPreferences
+	 */
+	private void saveToShrPref(String contactName, String phoneNum) {
+
+		PreferenceManager pref = new PreferenceManager(context);
+		pref.setStringData(Constants.EMERGENCY_CONTACT_NAME, contactName);
+		pref.setStringData(Constants.EMERGENCY_CONTACT_NUMBER, phoneNum);
+
+	}
+
+	@Override
+	public boolean onCreateOptionsMenu(Menu menu) {
+		// TODO Auto-generated method stub
+		getMenuInflater().inflate(R.menu.voice_book, menu);
+		return true;
+	}
+
+	@Override
+	public boolean onOptionsItemSelected(MenuItem item) {
+		// TODO Auto-generated method stub
+
+		switch (item.getItemId()) {
+		case R.id.menu_emergency_contact:
+			
+			PreferenceManager pref = new PreferenceManager(context);
+			final String contactName = pref.getStringData((Constants.EMERGENCY_CONTACT_NAME));
+			final String phoneNum = pref.getStringData((Constants.EMERGENCY_CONTACT_NUMBER));
+		
+			if( contactName != null &&  phoneNum != null)
+			{
+				MaterialDialog dialog = new MaterialDialog(context,
+						context.getString(R.string.emergency_contact),
+						"Name : " + contactName + "\nNumber : "
+								+ phoneNum,
+						context.getString(R.string.update),
+						context.getString(R.string.cancel));
+				dialog.setOnAcceptButtonClickListener(new OnClickListener() {
+
+					@Override
+					public void onClick(View v) {
+
+						Intent i = new Intent(Intent.ACTION_PICK, Contacts.CONTENT_URI);
+						startActivityForResult(i, REQ_CODE_SELECT_CONTACT);
+					}
+				});
+				dialog.setOnCancelButtonClickListener(new OnClickListener() {
+
+					@Override
+					public void onClick(View v) {
+
+					}
+				});
+				dialog.show();
+			}
+			else
+			{
+				Intent i = new Intent(Intent.ACTION_PICK, Contacts.CONTENT_URI);
+				super.startActivityForResult(i, REQ_CODE_SELECT_CONTACT);
+			}
+
+			break;
+
+		default:
+			break;
+		}
+
+		return super.onOptionsItemSelected(item);
+	}
+
+	@Override
+	public void onClick(View v) {
+		// TODO Auto-generated method stub
+		switch (v.getId()) {
+		case R.id.btnSpeak:
+			promptSpeechInput();
+			break;
+
+		default:
+			break;
+		}
+	}
+
+	private class GetCabBookingRequestTask extends
+			AsyncTask<String, Void, String> {
+
+		@Override
+		protected void onPreExecute() {
+			super.onPreExecute();
+			speakOut("Please Wait while your cab is being booked");
+			mProgressDialog.setMessage("Please Wait while your cab is being booked");
+			mProgressDialog.show();
+		}
+
+		@Override
+		protected String doInBackground(String... params) {
+			List<NameValuePair> apiParams = new ArrayList<NameValuePair>(1);
+			apiParams.add(new BasicNameValuePair("userId", mId));
+			apiParams.add(new BasicNameValuePair("lat", mLat + ""));
+			apiParams.add(new BasicNameValuePair("lon", mLng + ""));
+			apiParams.add(new BasicNameValuePair("address", mAddress));
+			apiParams.add(new BasicNameValuePair("bookingTime", mBookingTime));
+			HttpUtil restAPIUtil = new HttpUtil(
+					Constants.REST_URL_GET_CAB_BOOKING_REQUEST, "POST",
+					apiParams);
+
+			mCabBookingResponseJson = restAPIUtil.makeRESTCall();
+			return null;
+		}
+
+		@Override
+		protected void onPostExecute(String result) {
+
+			if (mProgressDialog != null) {
+				mProgressDialog.cancel();
+			}
+
+			if (mCabBookingResponseJson == null
+					|| mCabBookingResponseJson.contains("Application Error")) {
+				Toast.makeText(getApplicationContext(),
+						"Server Error while fetching REST API",
+						Toast.LENGTH_SHORT).show();
+				finish();
+			}
+
+			Gson gson = new Gson();
+			CabBookingResponse mCabBookingResponse = gson.fromJson(
+					mCabBookingResponseJson, CabBookingResponse.class);
+			Log.d(TAG,
+					"CabBookingResponse: "
+							+ mCabBookingResponse.getDriverName());
+			Intent intent = new Intent(getApplicationContext(),
+					CabDetailsActivity.class);
+			intent.putExtra(Constants.DRIVER_NAME,
+					mCabBookingResponse.getDriverName());
+			intent.putExtra(Constants.DRIVER_MOBILE,
+					mCabBookingResponse.getDriverMobile());
+			intent.putExtra(Constants.DRIVER_DURATION,
+					mCabBookingResponse.getDuration());
+			intent.putExtra(Constants.DRIVER_CAR_MODEL,
+					mCabBookingResponse.getCarModel());
+			intent.putExtra(Constants.DRIVER_CAR_LICENSE,
+					mCabBookingResponse.getLicenseNumber());
+
+
+			new Runnable() {
+					@Override
+					public void run() {
+						// TODO Auto-generated method stub
+						final PreferenceManager pref = new PreferenceManager(context);
+						final String contactName = pref.getStringData((Constants.EMERGENCY_CONTACT_NAME));
+						final String phoneNum = pref.getStringData((Constants.EMERGENCY_CONTACT_NUMBER));
+						if( contactName != null &&  phoneNum != null)
+						{
+							sendEmergencyMessage(phoneNum, "Cab Driver Id : "+mId+", Lat : "+mLat+", Lng "+mLng);
+						}
+					}
+			};
+
+			startActivity(intent);
+
+		}
+		
+	}
+	
+	@SuppressWarnings("deprecation")
+	public void sendEmergencyMessage(String number, String msg) {
+		// TODO Auto-generated method stub
+		SmsManager smsManager = SmsManager.getDefault();
+		smsManager.sendTextMessage(number, null, msg, null, null);
+	}
+
+	@Override
+	public void onInit(int status) {
+		if (status == TextToSpeech.SUCCESS) {
+			int result = mTextToSpeech.setLanguage(Locale.US);
+			// mTextToSpeech.setPitch(5); // set pitch level
+			mTextToSpeech.setSpeechRate(0.8f); // set speech speed rate
+			if (result == TextToSpeech.LANG_MISSING_DATA
+					|| result == TextToSpeech.LANG_NOT_SUPPORTED) {
+				Log.e("TextToSpeech", "Language is not supported");
+			}
+			speakOut("Tap on mike and say; CHALLO NEEKLLO!");
+		} else {
+			Log.e("TextToSpeech", "Initilization Failed");
+		}
+		
+		
+		
+	}
+	
+	@Override
+	public void onDestroy() {
+		/*
+		 *  Don't forget to shutdown!
+		 */
+		if (mTextToSpeech != null) {
+			mTextToSpeech.stop();
+			mTextToSpeech.shutdown();
+		}
+		super.onDestroy();
+	}
+	
+	private void speakOut(String textToSpeak) {
+		mTextToSpeech.speak(textToSpeak, TextToSpeech.QUEUE_FLUSH, null);
+	}
+
+}
